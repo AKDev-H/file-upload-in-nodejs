@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Nice Chunk Upload</title>
+        <style>
+            * {
+                box-sizing: border-box;
+                font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            }
+            body {
+                margin: 0;
+                background: #0f172a;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+            }
+            .container {
+                width: 100%;
+                max-width: 500px;
+                padding: 20px;
+            }
+            h1 {
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .dropzone {
+                border: 2px dashed #334155;
+                border-radius: 16px;
+                padding: 40px 20px;
+                text-align: center;
+                background: #020617;
+                transition: 0.3s;
+                cursor: pointer;
+            }
+            .dropzone.dragover {
+                border-color: #38bdf8;
+                background: #0c4a6e;
+            }
+            .dropzone p {
+                margin: 0;
+                color: #94a3b8;
+            }
+            .dropzone strong {
+                color: #38bdf8;
+            }
+            input[type="file"] {
+                display: none;
+            }
+            .file-list {
+                margin-top: 20px;
+            }
+
+            /* ─── File item base ──────────────────────────────────────── */
+            .file-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #020617;
+                padding: 12px 16px;
+                border-radius: 10px;
+                margin-bottom: 10px;
+                border: 1px solid #1e293b;
+                gap: 12px;
+                opacity: 1;
+                transition: all 0.4s ease-out;
+            }
+
+            .file-item.pending {
+                opacity: 0.65;
+                background: #1e293b;
+            }
+            .file-item.mismatch {
+                border-color: #ef4444;
+            }
+
+            .file-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex: 1;
+                min-width: 0;
+            }
+            .file-media {
+                position: relative;
+                width: 44px;
+                height: 44px;
+                transition: transform 0.25s ease;
+            }
+            .file-item:hover .file-media {
+                transform: scale(1.08);
+            }
+
+            /* Progress circle */
+            .progress-circle {
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                background: conic-gradient(
+                    #38bdf8 calc(var(--progress) * 1%),
+                    #1e293b 0
+                );
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: absolute;
+                inset: 0;
+                transition: background 0.5s ease;
+            }
+            .progress-circle::before {
+                content: "";
+                position: absolute;
+                width: 34px;
+                height: 34px;
+                background: #0f172a;
+                border-radius: 50%;
+            }
+            .progress-text {
+                position: relative;
+                font-size: 10px;
+                color: white;
+                z-index: 2;
+            }
+
+            /* Preview / Icon */
+            .file-preview,
+            .file-icon {
+                width: 44px;
+                height: 44px;
+                border-radius: 8px;
+                object-fit: cover;
+                transition:
+                    opacity 0.4s ease,
+                    transform 0.3s ease;
+                cursor: pointer;
+            }
+            .file-preview {
+                width: 45px;
+                height: 45px;
+                flex-shrink: 0;
+            }
+            .file-icon {
+                background: #1e293b;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 20px;
+            }
+            .file-preview:hover,
+            .file-icon:hover {
+                transform: scale(1.12);
+                opacity: 0.92;
+            }
+
+            .file-info {
+                overflow: hidden;
+            }
+            .file-name {
+                font-size: 14px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .file-size {
+                font-size: 12px;
+                color: #94a3b8;
+            }
+
+            .file-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .status {
+                font-size: 12px;
+            }
+            .status.uploading {
+                color: #38bdf8;
+            }
+            .status.done {
+                color: #22c55e;
+            }
+            .status.pending {
+                color: #f59e0b;
+            }
+
+            .remove-btn {
+                background: #ef4444;
+                border: none;
+                color: white;
+                padding: 6px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: 0.2s;
+            }
+            .remove-btn:hover {
+                background: #dc2626;
+            }
+
+            .upload-btn {
+                background: #38bdf8;
+                border: none;
+                color: #020617;
+                padding: 6px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: 0.2s;
+            }
+            .upload-btn:hover {
+                background: #0ea5e9;
+            }
+
+            .reselect-btn {
+                background: #f59e0b;
+                color: #000;
+                font-size: 11px;
+                padding: 4px 10px;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            /* Modals */
+            .modal-overlay,
+            .preview-modal {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.75);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 2000;
+                backdrop-filter: blur(4px);
+            }
+            .preview-modal {
+                z-index: 3000;
+                backdrop-filter: blur(8px);
+            }
+
+            .modal-content,
+            .preview-content {
+                background: #0f172a;
+                border: 1px solid #334155;
+                border-radius: 16px;
+                width: 90%;
+                max-width: 420px;
+                overflow: hidden;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+                animation: modalFadeIn 0.3s ease-out;
+                position: relative;
+            }
+            @keyframes modalFadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 16px 20px;
+                border-bottom: 1px solid #1e293b;
+                background: #020617;
+            }
+            .modal-header h2 {
+                margin: 0;
+                font-size: 1.3rem;
+                color: #e2e8f0;
+            }
+
+            .modal-close-btn,
+            .preview-close {
+                background: none;
+                border: none;
+                color: #94a3b8;
+                font-size: 1.8rem;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0 8px;
+            }
+            .modal-close-btn:hover,
+            .preview-close:hover {
+                color: #f87171;
+            }
+
+            .modal-body {
+                padding: 20px;
+                font-size: 0.98rem;
+                line-height: 1.5;
+                color: #cbd5e1;
+            }
+            .modal-footer {
+                padding: 16px 20px;
+                border-top: 1px solid #1e293b;
+                text-align: right;
+                background: #020617;
+            }
+            .modal-btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 8px;
+                font-size: 0.95rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .modal-btn.primary {
+                background: #38bdf8;
+                color: #020617;
+            }
+            .modal-btn.primary:hover {
+                background: #0ea5e9;
+                transform: translateY(-1px);
+            }
+
+            .preview-content {
+                max-width: 90vw;
+                max-height: 90vh;
+            }
+            #previewImage,
+            #previewVideo {
+                max-width: 100%;
+                max-height: 90vh;
+                object-fit: contain;
+            }
+            #previewFallback {
+                color: #94a3b8;
+                padding: 40px;
+                text-align: center;
+            }
+
+            /* Remove Confirmation Modal specific styles */
+            .remove-confirm {
+                max-width: 380px;
+            }
+
+            .remove-confirm .modal-body {
+                text-align: center;
+            }
+
+            .remove-confirm .file-to-remove {
+                font-weight: 500;
+                color: #38bdf8;
+                margin: 0.8rem 0;
+                word-break: break-all;
+            }
+
+            .modal-btn.cancel {
+                background: #334155;
+                color: #e2e8f0;
+            }
+
+            .modal-btn.cancel:hover {
+                background: #475569;
+            }
+
+            .modal-btn.danger {
+                background: #ef4444;
+                color: white;
+            }
+
+            .modal-btn.danger:hover {
+                background: #dc2626;
+                transform: translateY(-1px);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Upload Files</h1>
+            <div class="dropzone" id="dropzone">
+                <p>
+                    <strong>Click to upload</strong> or drag and drop files here
+                </p>
+            </div>
+            <input type="file" id="fileInput" multiple />
+            <div class="file-list" id="fileList"></div>
+
+            <!-- Reselect Modal -->
+            <div id="reselectModal" class="modal-overlay" style="display: none">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Action Required</h2>
+                        <button
+                            class="modal-close-btn"
+                            onclick="closeReselectModal()"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p>The page was refreshed or reopened.</p>
+                        <p>
+                            <strong>Some files need to be re-selected</strong>
+                            to continue or resume uploading.
+                        </p>
+                        <p>
+                            Look for items marked
+                            <span style="color: #f59e0b">Waiting for file</span>
+                            — click "Re-select" next to them.
+                        </p>
+                        <p
+                            style="
+                                margin-top: 1.2rem;
+                                font-size: 0.95rem;
+                                opacity: 0.85;
+                            "
+                        >
+                            Your upload progress is saved — once you re-attach
+                            the correct files, you can resume from where you
+                            left off.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="modal-btn primary"
+                            onclick="closeReselectModal()"
+                        >
+                            Got it — let's continue
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Modal -->
+            <div id="previewModal" class="preview-modal">
+                <div class="preview-content">
+                    <button class="preview-close" onclick="closePreview()">
+                        ×
+                    </button>
+                    <img id="previewImage" style="display: none" />
+                    <video
+                        id="previewVideo"
+                        controls
+                        style="display: none"
+                    ></video>
+                    <div
+                        id="previewFallback"
+                        style="
+                            display: none;
+                            color: #94a3b8;
+                            padding: 40px;
+                            text-align: center;
+                        "
+                    >
+                        <p style="font-size: 1.3rem">Preview not available</p>
+                        <p>
+                            <a
+                                id="previewDownloadLink"
+                                style="
+                                    color: #38bdf8;
+                                    text-decoration: underline;
+                                "
+                                >Download file</a
+                            >
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Remove Confirmation Modal -->
+            <div
+                id="removeConfirmModal"
+                class="modal-overlay"
+                style="display: none"
+            >
+                <div class="modal-content remove-confirm">
+                    <div class="modal-header">
+                        <h2>Remove File?</h2>
+                        <button
+                            class="modal-close-btn"
+                            onclick="closeRemoveModal()"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to remove this file?</p>
+                        <p class="file-to-remove" id="fileToRemoveName"></p>
+                        <p
+                            style="
+                                font-size: 0.9rem;
+                                opacity: 0.7;
+                                margin-top: 1rem;
+                            "
+                        >
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="modal-btn cancel"
+                            onclick="closeRemoveModal()"
+                        >
+                            Cancel
+                        </button>
+                        <button class="modal-btn danger" id="confirmRemoveBtn">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
+            const STORAGE_KEY = "resumable_uploads_v1";
+            let hasShownReselectHint = false;
+            let removeIndexToConfirm = -1;
+
+            const dropzone = document.getElementById("dropzone");
+            const fileInput = document.getElementById("fileInput");
+            const fileListEl = document.getElementById("fileList");
+
+            let pendingFiles = loadFromStorage();
+            const fileItemMap = new Map();
+
+            const uploadControllers = new Map();
+            const controller = new AbortController();
+
+            dropzone.addEventListener("click", () => fileInput.click());
+            fileInput.addEventListener("change", (e) =>
+                handleNewFiles(e.target.files),
+            );
+            dropzone.addEventListener("dragover", (e) => {
+                e.preventDefault();
+                dropzone.classList.add("dragover");
+            });
+            dropzone.addEventListener("dragleave", () =>
+                dropzone.classList.remove("dragover"),
+            );
+            dropzone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                dropzone.classList.remove("dragover");
+                handleNewFiles(e.dataTransfer.files);
+            });
+
+            window.addEventListener("load", restoreAndRender);
+
+            function loadFromStorage() {
+                try {
+                    const json = sessionStorage.getItem(STORAGE_KEY);
+                    return json ? JSON.parse(json) : [];
+                } catch {
+                    return [];
+                }
+            }
+
+            function saveToStorage() {
+                sessionStorage.setItem(
+                    STORAGE_KEY,
+                    JSON.stringify(pendingFiles),
+                );
+            }
+
+            function handleNewFiles(newFiles) {
+                for (const file of newFiles) {
+                    const match = pendingFiles.find(
+                        (p) =>
+                            p.name === file.name &&
+                            p.size === file.size &&
+                            Math.abs(p.lastModified - file.lastModified) <=
+                                2000,
+                    );
+
+                    if (match) {
+                        match.file = file;
+                        match.status =
+                            match.uploadedChunks < match.totalChunks
+                                ? "idle"
+                                : "done";
+                    } else {
+                        pendingFiles.push(createPendingFile(file));
+                    }
+                }
+                saveToStorage();
+                renderFiles();
+                showReselectModal();
+            }
+
+            function createPendingFile(file) {
+                const baseId = `${file.name}-${file.size}-${file.lastModified}`;
+
+                const existing = pendingFiles.find((p) => p.id === baseId);
+                if (existing) {
+                    return existing;
+                }
+
+                const total = Math.ceil(file.size / CHUNK_SIZE);
+                return {
+                    id: baseId,
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    lastModified: file.lastModified,
+                    totalChunks: total,
+                    uploadedChunks: 0,
+                    progress: 0,
+                    status: "idle",
+                    file: file,
+                    url: null,
+                };
+            }
+
+            async function restoreAndRender() {
+                pendingFiles.forEach((p) => {
+                    p.file = null;
+                    if (p.status === "uploading") {
+                        p.status = "idle";
+                    }
+                });
+
+                for (const p of pendingFiles) {
+                    if (p.status === "done") continue;
+                    try {
+                        const res = await fetch(
+                            `/upload/status?fileId=${encodeURIComponent(p.id)}`,
+                        );
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.uploadedChunks !== undefined) {
+                                p.uploadedChunks = data.uploadedChunks;
+                                p.progress = Math.floor(
+                                    (p.uploadedChunks / p.totalChunks) * 100,
+                                );
+                                p.status =
+                                    p.uploadedChunks >= p.totalChunks
+                                        ? "done"
+                                        : "idle";
+                            }
+                        }
+                    } catch {}
+                }
+
+                renderFiles();
+                showReselectModal();
+            }
+
+            function renderFiles() {
+                const currentIds = new Set(pendingFiles.map((p) => p.id));
+
+                for (const [id, el] of [...fileItemMap.entries()]) {
+                    if (!currentIds.has(id)) {
+                        el.remove();
+                        fileItemMap.delete(id);
+                    }
+                }
+
+                pendingFiles.forEach((p, index) => {
+                    let itemEl = fileItemMap.get(p.id);
+
+                    if (!itemEl) {
+                        itemEl = document.createElement("div");
+                        itemEl.className = `file-item`;
+                        itemEl.dataset.id = p.id;
+                        itemEl.dataset.index = index;
+
+                        itemEl.innerHTML = `
+                <div class="file-left">
+                    <div class="file-media">
+                        <div class="progress-circle" style="--progress: 0">
+                            <span class="progress-text">0%</span>
+                        </div>
+                        <div class="file-icon">📄</div>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name"></div>
+                        <div class="file-size"></div>
+                    </div>
+                </div>
+                <div class="file-actions"></div>
+            `;
+
+                        fileListEl.appendChild(itemEl);
+                        fileItemMap.set(p.id, itemEl);
+                    }
+
+                    // Step 3: Update classes
+                    itemEl.className = `file-item ${!p.file ? "pending" : ""} ${
+                        p.status === "error" ? "mismatch" : ""
+                    } ${p.status}`;
+                    itemEl.dataset.index = index;
+
+                    itemEl.querySelector(".file-name").textContent =
+                        p.name + (!p.file ? " (missing)" : "");
+                    itemEl.querySelector(".file-size").textContent =
+                        `${formatBytes(p.size)}`;
+
+                    const progressCircle =
+                        itemEl.querySelector(".progress-circle");
+                    let mediaContent = itemEl.querySelector(
+                        ".file-preview, .file-icon",
+                    );
+
+                    if (p.status === "done" && p.url) {
+                        progressCircle.style.display = "none";
+
+                        if (p.type?.startsWith("image/")) {
+                            if (mediaContent.classList.contains("file-icon")) {
+                                const img = document.createElement("img");
+                                img.className = "file-preview";
+                                img.src = p.url;
+                                img.onclick = () => openPreview(index);
+                                mediaContent.replaceWith(img);
+                                mediaContent = img;
+                            } else {
+                                mediaContent.src = p.url;
+                                mediaContent.onclick = () => openPreview(index);
+                            }
+                        } else {
+                            if (
+                                mediaContent.classList.contains("file-preview")
+                            ) {
+                                const div = document.createElement("div");
+                                div.className = "file-icon";
+                                div.textContent = "↪";
+                                div.onclick = () => openPreview(index);
+                                mediaContent.replaceWith(div);
+                                mediaContent = div;
+                            } else {
+                                mediaContent.textContent = "↪";
+                                mediaContent.onclick = () => openPreview(index);
+                            }
+                        }
+                    } else {
+                        progressCircle.style.display = "flex";
+                        progressCircle.style.setProperty(
+                            "--progress",
+                            p.progress,
+                        );
+                        progressCircle.querySelector(
+                            ".progress-text",
+                        ).textContent = `${p.progress}%`;
+
+                        if (
+                            mediaContent.classList.contains("file-preview") &&
+                            !p.type?.startsWith("image/")
+                        ) {
+                            const div = document.createElement("div");
+                            div.className = "file-icon";
+                            div.textContent = "📄";
+                            mediaContent.replaceWith(div);
+                            mediaContent = div;
+                        }
+                    }
+
+                    // Update actions (this part is safe)
+                    const actionsEl = itemEl.querySelector(".file-actions");
+                    let actionsHTML = "";
+
+                    if (p.status === "done") {
+                        actionsHTML = `<span class="status done">Done ✓</span>`;
+                    } else if (p.status === "uploading") {
+                        actionsHTML = `<span class="status uploading">Uploading...</span>`;
+                    } else if (!p.file) {
+                        actionsHTML = `
+                <span class="status pending">Waiting for file</span>
+                <button class="reselect-btn" onclick="reselectFile(${index})">Re-select</button>
+            `;
+                    } else {
+                        actionsHTML = `<button class="upload-btn" onclick="startUpload(${index})">Upload / Resume</button>`;
+                    }
+
+                    actionsHTML += ` <button class="remove-btn" onclick="removeFile(${index})">X</button>`;
+                    actionsEl.innerHTML = actionsHTML;
+                });
+            }
+
+            function reselectFile(index) {
+                const p = pendingFiles[index];
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = p.type || "*/*";
+                input.onchange = (e) => {
+                    if (e.target.files?.[0]) {
+                        handleNewFiles([e.target.files[0]]);
+                    }
+                };
+                input.click();
+            }
+
+            async function startUpload(index) {
+                const item = pendingFiles[index];
+                uploadControllers.set(item.id, controller);
+
+                if (!item.file) return alert("Please re-select the file first");
+                if (item.status === "uploading") return;
+
+                item.status = "uploading";
+                renderFiles(); // update UI immediately
+
+                const total = item.totalChunks;
+                const startChunk = item.uploadedChunks;
+
+                for (let i = startChunk; i < total; i++) {
+                    if (item.status === "canceled") break;
+
+                    const start = i * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, item.size);
+                    const chunk = item.file.slice(start, end);
+
+                    const formData = new FormData();
+                    formData.append("fileId", item.id);
+                    formData.append("chunk", chunk);
+                    formData.append("chunkIndex", i);
+                    formData.append("totalChunks", total);
+                    formData.append("fileName", item.name);
+                    formData.append("fileSize", item.size);
+                    formData.append("lastModified", item.lastModified);
+
+                    try {
+                        const res = await fetch("/upload", {
+                            method: "POST",
+                            body: formData,
+                            signal: controller.signal,
+                        });
+                        const data = await res.json();
+
+                        if (!data.success)
+                            throw new Error(data.error || "Upload failed");
+
+                        item.uploadedChunks = i + 1;
+                        item.progress = Math.floor(
+                            (item.uploadedChunks / total) * 100,
+                        );
+                        item.url = data.file.url;
+
+                        if (data.done || item.uploadedChunks >= total) {
+                            item.status = "done";
+                            if (data.url) item.url = data.url;
+                        }
+
+                        updateProgressUI(item);
+
+                        saveToStorage();
+                    } catch (err) {
+                        item.status = "error";
+                        console.error(err);
+                        renderFiles();
+                        return;
+                    }
+
+                    await new Promise((r) => setTimeout(r, 80));
+                }
+            }
+
+            function removeFile(index) {
+                showRemoveConfirm(index);
+            }
+
+            function formatBytes(bytes) {
+                if (!bytes) return "—";
+                const k = 1024;
+                const sizes = ["B", "KB", "MB", "GB"];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return (
+                    parseFloat((bytes / Math.pow(k, i)).toFixed(2)) +
+                    " " +
+                    sizes[i]
+                );
+            }
+
+            function showReselectModal() {
+                if (hasShownReselectHint) return;
+
+                const modal = document.getElementById("reselectModal");
+                if (!modal) return;
+
+                const hasUnfinished = pendingFiles.some(
+                    (p) =>
+                        p.uploadedChunks < p.totalChunks && p.status !== "done",
+                );
+
+                if (hasUnfinished) {
+                    const reallyPending = pendingFiles.some((p) => !p.file);
+                    if (reallyPending) {
+                        modal.style.display = "flex";
+                        hasShownReselectHint = true;
+                    }
+                }
+            }
+
+            function closeReselectModal() {
+                const modal = document.getElementById("reselectModal");
+                if (modal) modal.style.display = "none";
+            }
+
+            function openPreview(index) {
+                const item = pendingFiles[index];
+                if (!item.url) {
+                    return alert("File not yet available for preview");
+                }
+
+                const modal = document.getElementById("previewModal");
+                const imgEl = document.getElementById("previewImage");
+                const videoEl = document.getElementById("previewVideo");
+                const fallbackEl = document.getElementById("previewFallback");
+                const downloadLink = document.getElementById(
+                    "previewDownloadLink",
+                );
+
+                imgEl.style.display = "none";
+                videoEl.style.display = "none";
+                fallbackEl.style.display = "none";
+
+                if (item.type.startsWith("image/")) {
+                    imgEl.src = item.url;
+                    imgEl.style.display = "block";
+                } else if (item.type.startsWith("video/")) {
+                    videoEl.src = item.url;
+                    videoEl.style.display = "block";
+                } else {
+                    fallbackEl.style.display = "block";
+                    downloadLink.href = item.url;
+                    downloadLink.download = item.name;
+                }
+
+                modal.style.display = "flex";
+            }
+
+            function closePreview() {
+                const modal = document.getElementById("previewModal");
+                if (modal) modal.style.display = "none";
+            }
+
+            function showRemoveConfirm(index) {
+                const item = pendingFiles[index];
+                if (!item) return;
+
+                removeIndexToConfirm = index;
+
+                const modal = document.getElementById("removeConfirmModal");
+                const nameEl = document.getElementById("fileToRemoveName");
+                const confirmBtn = document.getElementById("confirmRemoveBtn");
+
+                if (!modal || !nameEl || !confirmBtn) return;
+
+                nameEl.textContent = item.name;
+
+                confirmBtn.onclick = () => {
+                    if (item.status === "done") {
+                        if (item.url) {
+                            fetch("/unlink", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ filePath: item.url }),
+                            }).catch(() => {});
+                        }
+                    } else {
+                        fetch("/upload/cancel", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ fileId: item.id }),
+                        }).catch(() => {});
+                    }
+
+                    pendingFiles.splice(removeIndexToConfirm, 1);
+                    saveToStorage();
+                    renderFiles();
+                    showReselectModal();
+
+                    closeRemoveModal();
+                    removeIndexToConfirm = -1;
+
+                    const controller = uploadControllers.get(item.id);
+                    if (controller) {
+                        controller.abort();
+                        uploadControllers.delete(item.id);
+                    }
+                };
+
+                modal.style.display = "flex";
+            }
+
+            function closeRemoveModal() {
+                const modal = document.getElementById("removeConfirmModal");
+                if (modal) {
+                    modal.style.display = "none";
+                    removeIndexToConfirm = -1;
+                }
+            }
+
+            function updateProgressUI(item) {
+                const el = fileItemMap.get(item.id);
+                if (!el) return;
+
+                const circle = el.querySelector(".progress-circle");
+                const text = el.querySelector(".progress-text");
+
+                if (!circle || !text) return;
+
+                circle.style.setProperty("--progress", item.progress);
+                text.textContent = `${item.progress}%`;
+            }
+        </script>
+    </body>
+</html>

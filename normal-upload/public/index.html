@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nice File Upload</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #0f172a;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .dropzone {
+            border: 2px dashed #334155;
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #020617;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .dropzone.dragover {
+            border-color: #38bdf8;
+            background: #0c4a6e;
+        }
+
+        .dropzone p {
+            margin: 0;
+            color: #94a3b8;
+        }
+
+        .dropzone strong {
+            color: #38bdf8;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #020617;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #1e293b;
+        }
+
+       .file-item {
+		    display: flex;
+		    justify-content: space-between;
+		    align-items: center;
+		    background: #020617;
+		    padding: 12px 16px;
+		    border-radius: 10px;
+		    margin-bottom: 10px;
+		    border: 1px solid #1e293b;
+		    gap: 12px;
+		}
+
+		/* LEFT SIDE */
+		.file-left {
+		    display: flex;
+		    align-items: center;
+		    gap: 12px;
+		    flex: 1;
+		    min-width: 0;
+		}
+
+		.file-preview {
+		    width: 45px;
+		    height: 45px;
+		    object-fit: cover;
+		    border-radius: 8px;
+		    flex-shrink: 0;
+		}
+
+		.file-icon {
+		    width: 45px;
+		    height: 45px;
+		    background: #1e293b;
+		    display: flex;
+		    align-items: center;
+		    justify-content: center;
+		    border-radius: 8px;
+		    font-size: 20px;
+		}
+
+		/* FILE TEXT */
+		.file-info {
+		    overflow: hidden;
+		}
+
+		.file-name {
+		    font-size: 14px;
+		    white-space: nowrap;
+		    overflow: hidden;
+		    text-overflow: ellipsis;
+		}
+
+		.file-size {
+		    font-size: 12px;
+		    color: #94a3b8;
+		}
+
+		/* RIGHT SIDE */
+		.file-actions {
+		    display: flex;
+		    align-items: center;
+		    gap: 8px;
+		}
+
+		/* STATUS */
+		.status {
+		    font-size: 12px;
+		}
+
+		.status.uploading {
+		    color: #38bdf8;
+		}
+
+		.status.done {
+		    color: #22c55e;
+		}
+
+        .remove-btn {
+            background: #ef4444;
+            border: none;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .remove-btn:hover {
+            background: #dc2626;
+        }
+
+        .upload-btn {
+		    background: #38bdf8;
+		    border: none;
+		    color: #020617;
+		    padding: 6px 12px;
+		    border-radius: 6px;
+		    cursor: pointer;
+		    font-size: 12px;
+		    transition: 0.2s;
+		}
+
+		.upload-btn:hover {
+		    background: #0ea5e9;
+		}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Upload Files</h1>
+
+    <div class="dropzone" id="dropzone">
+        <p><strong>Click to upload</strong> or drag and drop files here</p>
+    </div>
+
+    <input type="file" id="fileInput" multiple>
+
+    <div class="file-list" id="fileList"></div>
+</div>
+
+<script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+
+    let filesArray = [];
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    function handleFiles(newFiles) {
+        for (let file of newFiles) {
+            filesArray.push({
+                file,
+                status: 'idle' // idle | uploading | done
+            });
+        }
+        renderFiles();
+    }
+
+    function renderFiles() {
+        fileList.innerHTML = '';
+
+        filesArray.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.classList.add('file-item');
+
+            div.innerHTML = `
+                <div class="file-left">
+			        ${
+			            item.url && item.file.type.startsWith('image/')
+			                ? `<img src="${item.url}" class="file-preview" />`
+			                : `<div class="file-icon">📄</div>`
+			        }
+			        <div class="file-info">
+			            <div class="file-name">${item.file.name}</div>
+			            <div class="file-size">${formatBytes(item.file.size)}</div>
+			        </div>
+				</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    ${
+                        item.status === 'idle'
+                            ? `<button class="upload-btn" onclick="uploadFile(${index})">Upload</button>`
+                            : item.status === 'uploading'
+                            ? `<span style="font-size:12px; color:#38bdf8;">Uploading...</span>`
+                            : `<span style="font-size:12px; color:#22c55e;">Done ✓</span>`
+                    }
+
+                    <button class="remove-btn" onclick="removeFile(${index})">X</button>
+                </div>
+            `;
+
+            fileList.appendChild(div);
+        });
+    }
+
+    function uploadFile(index) {
+        const item = filesArray[index];
+        item.status = 'uploading';
+        renderFiles();
+
+        const formData = new FormData();
+        formData.append('file', item.file);
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then((data) => {
+        	if(!data.success) {
+        		item.status = 'idle';
+        		alert(data.message)
+        	} else {
+        		item.status = 'done';
+            	item.url = data.file.path;
+        	}
+        	renderFiles();
+        })
+        .catch((error) => {
+            item.status = 'idle';
+            renderFiles();
+        });
+    }
+
+    function removeFile(index) {
+    	const item = filesArray[index];
+
+    	if(!item.url) {
+    		filesArray.splice(index, 1)
+    		return renderFiles();
+    	}
+
+    	fetch('/unlink', {
+    		method: "POST",
+    		headers: {
+    			"Content-Type": "application/json"
+    		},
+    		body: JSON.stringify({filePath: item.url}),
+    	})
+    		.then(res => res.json())
+    		.then(data => {
+    			filesArray.splice(index, 1);
+        		renderFiles();
+    		})
+    		.catch(() => {
+    			alert('File delete failed !')
+            	renderFiles();
+        	});
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+</script>
+
+</body>
+</html>
